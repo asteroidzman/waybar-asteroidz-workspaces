@@ -35,6 +35,7 @@ typedef struct {
 
   char *active_monitor;            // name of active monitor
   char layout_symbol[32];          // active monitor's layout symbol (S/T/M…)
+  char *layout_dir;                // dir with tile/scroller/monocle.svg
   char tag_name[MAXTAGS + 1][128];
   int tag_clients[MAXTAGS + 1];
   int tag_active[MAXTAGS + 1];
@@ -254,9 +255,26 @@ static void rebuild(Instance *self) {
     GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     gtk_widget_set_margin_start(lh, seg_hp);
     gtk_widget_set_margin_end(lh, seg_hp);
-    char lt[48];
-    g_snprintf(lt, sizeof lt, "◫ %s", self->layout_symbol);
-    gtk_box_pack_start(GTK_BOX(lh), gtk_label_new(lt), FALSE, FALSE, 0);
+
+    // Prefer a per-layout image (tile/scroller/monocle.svg); fall back to text.
+    const char *lname = NULL;
+    if (!strcmp(self->layout_symbol, "T")) lname = "tile";
+    else if (!strcmp(self->layout_symbol, "S")) lname = "scroller";
+    else if (!strcmp(self->layout_symbol, "M")) lname = "monocle";
+    GtkWidget *licon = NULL;
+    if (lname && self->layout_dir) {
+      char *path = g_strdup_printf("%s/%s.svg", self->layout_dir, lname);
+      GdkPixbuf *pb = gdk_pixbuf_new_from_file_at_size(path, self->icon_size, self->icon_size, NULL);
+      g_free(path);
+      if (pb) { licon = gtk_image_new_from_pixbuf(pb); g_object_unref(pb); }
+    }
+    if (licon) {
+      gtk_box_pack_start(GTK_BOX(lh), licon, FALSE, FALSE, 0);
+    } else {
+      char lt[48];
+      g_snprintf(lt, sizeof lt, "◫ %s", self->layout_symbol);
+      gtk_box_pack_start(GTK_BOX(lh), gtk_label_new(lt), FALSE, FALSE, 0);
+    }
     gtk_container_add(GTK_CONTAINER(lb), lh);
     g_signal_connect(lb, "button-press-event", G_CALLBACK(on_layout_pressed), NULL);
     gtk_box_pack_start(GTK_BOX(self->box), lb, FALSE, FALSE, 0);
@@ -413,6 +431,12 @@ void *wbcffi_init(const wbcffi_init_info *info,
     else if (!strcmp(entries[i].key, "grouped")) self->grouped = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
     else if (!strcmp(entries[i].key, "cursor-size")) cursor_size = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "layout-icon-dir")) { g_free(self->layout_dir); self->layout_dir = g_strdup(entries[i].value); }
+  }
+  if (!self->layout_dir) {
+    const char *dh = g_getenv("XDG_DATA_HOME");
+    self->layout_dir = (dh && *dh) ? g_build_filename(dh, "asteroidz-ws", "layouts", NULL)
+                                   : g_build_filename(g_get_home_dir(), ".local/share/asteroidz-ws/layouts", NULL);
   }
 
   // Match the compositor's cursor so the pointer size doesn't change over the
@@ -456,5 +480,6 @@ void wbcffi_deinit(void *instance) {
     if (self->tag_titles[n]) g_ptr_array_free(self->tag_titles[n], TRUE);
   }
   g_free(self->active_monitor);
+  g_free(self->layout_dir);
   g_free(self);
 }

@@ -52,7 +52,8 @@ Options:
 | `max-icons` | 3 | max app icons per pill before a `+N` chip |
 | `min-pills` | 3 | pad empty tags until at least this many pills show |
 | `grouped` | 1 | 1 = one container pill with tags/layout as inset segments; 0 = separate pills |
-| `show-layout` | 1 | render the layout-symbol pill (click cycles the layout) |
+| `show-layout` | 1 | render the layout pill (click cycles the layout); shows `layouts/{tile,scroller,monocle}.svg` if present, else the text symbol |
+| `layout-icon-dir` | `$XDG_DATA_HOME/asteroidz-ws/layouts` | dir holding the layout SVGs (installed by `make install`) |
 | `unfocused-saturation` | 0.4 | icon saturation on unfocused occupied tags (1.0 = full colour) |
 | `cursor-size` | *(unset)* | set to the **compositor's** cursor size so the pointer doesn't change size over the module (GTK otherwise uses its own size). Theme follows `XCURSOR_THEME`. |
 
