@@ -30,6 +30,7 @@ typedef struct {
   int max_icons;                   // per tag
   int min_pills;                   // pad empties up to this many
   int show_layout;                 // render the layout-symbol pill
+  int grouped;                     // one container pill with segments (vs separate pills)
   double unfocused_saturation;     // icon saturation on unfocused occupied tags
 
   char *active_monitor;            // name of active monitor
@@ -149,6 +150,12 @@ static void rebuild(Instance *self) {
   int need = self->min_pills - relcount;
   if (need < 0) need = 0;
 
+  // In grouped mode segments are inset inside the container pill (smaller vertical
+  // margin, tighter padding); otherwise each is a full standalone pill.
+  int seg_mv = self->grouped ? 5 : 9;
+  int seg_mh = self->grouped ? 3 : 3;
+  int seg_hp = self->grouped ? 8 : 12;
+
   for (int n = 1; n <= MAXTAGS; n++) {
     int relevant = (self->tag_clients[n] > 0 || self->tag_active[n]);
     int padding = (n > maxrel && n <= maxrel + need);
@@ -156,10 +163,10 @@ static void rebuild(Instance *self) {
 
     GtkWidget *btn = gtk_event_box_new();
     gtk_widget_add_events(btn, GDK_BUTTON_PRESS_MASK);
-    gtk_widget_set_margin_top(btn, 9);      // 48px pill in a 66px bar
-    gtk_widget_set_margin_bottom(btn, 9);
-    gtk_widget_set_margin_start(btn, 3);     // gap between pills
-    gtk_widget_set_margin_end(btn, 3);
+    gtk_widget_set_margin_top(btn, seg_mv);
+    gtk_widget_set_margin_bottom(btn, seg_mv);
+    gtk_widget_set_margin_start(btn, seg_mh);
+    gtk_widget_set_margin_end(btn, seg_mh);
     GtkStyleContext *ctx = gtk_widget_get_style_context(btn);
     gtk_style_context_add_class(ctx, "ws-pill");
     int is_focused_tag = self->tag_active[n];
@@ -169,8 +176,8 @@ static void rebuild(Instance *self) {
     else gtk_style_context_add_class(ctx, "empty");
 
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-    gtk_widget_set_margin_start(hbox, 12);   // horizontal padding inside the pill
-    gtk_widget_set_margin_end(hbox, 12);
+    gtk_widget_set_margin_start(hbox, seg_hp);   // horizontal padding inside the segment
+    gtk_widget_set_margin_end(hbox, seg_hp);
 
     char idx[8];
     g_snprintf(idx, sizeof idx, "%d", n);
@@ -237,16 +244,16 @@ static void rebuild(Instance *self) {
   if (self->show_layout && self->layout_symbol[0]) {
     GtkWidget *lb = gtk_event_box_new();
     gtk_widget_add_events(lb, GDK_BUTTON_PRESS_MASK);
-    gtk_widget_set_margin_top(lb, 9);
-    gtk_widget_set_margin_bottom(lb, 9);
-    gtk_widget_set_margin_start(lb, 3);
-    gtk_widget_set_margin_end(lb, 3);
+    gtk_widget_set_margin_top(lb, seg_mv);
+    gtk_widget_set_margin_bottom(lb, seg_mv);
+    gtk_widget_set_margin_start(lb, seg_mh);
+    gtk_widget_set_margin_end(lb, seg_mh);
     GtkStyleContext *lc = gtk_widget_get_style_context(lb);
     gtk_style_context_add_class(lc, "ws-pill");
     gtk_style_context_add_class(lc, "ws-layout");
     GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-    gtk_widget_set_margin_start(lh, 12);
-    gtk_widget_set_margin_end(lh, 12);
+    gtk_widget_set_margin_start(lh, seg_hp);
+    gtk_widget_set_margin_end(lh, seg_hp);
     char lt[48];
     g_snprintf(lt, sizeof lt, "◫ %s", self->layout_symbol);
     gtk_box_pack_start(GTK_BOX(lh), gtk_label_new(lt), FALSE, FALSE, 0);
@@ -394,6 +401,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
   self->max_icons = 3;
   self->min_pills = 3;
   self->show_layout = 1;
+  self->grouped = 1;
   self->unfocused_saturation = 0.4;
 
   int cursor_size = 0;  // 0 = leave GTK default alone
@@ -402,6 +410,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
     else if (!strcmp(entries[i].key, "max-icons")) self->max_icons = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "min-pills")) self->min_pills = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "show-layout")) self->show_layout = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "grouped")) self->grouped = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
     else if (!strcmp(entries[i].key, "cursor-size")) cursor_size = atoi(entries[i].value);
   }
@@ -418,6 +427,14 @@ void *wbcffi_init(const wbcffi_init_info *info,
   GtkContainer *root = info->get_root_widget(info->obj);
   self->box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_set_name(self->box, "asteroidz-ws");
+  if (self->grouped) {
+    // The box itself becomes one container pill (segments live inside it).
+    gtk_style_context_add_class(gtk_widget_get_style_context(self->box), "grouped");
+    gtk_widget_set_margin_top(self->box, 9);     // 48px container in a 66px bar
+    gtk_widget_set_margin_bottom(self->box, 9);
+    gtk_widget_set_margin_start(self->box, 4);    // gap from neighbours
+    gtk_widget_set_margin_end(self->box, 4);
+  }
   gtk_container_add(root, self->box);
   gtk_widget_show_all(GTK_WIDGET(root));
 

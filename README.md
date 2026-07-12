@@ -51,8 +51,13 @@ Options:
 | `icon-size` | 18 | app-icon pixel size |
 | `max-icons` | 3 | max app icons per pill before a `+N` chip |
 | `min-pills` | 3 | pad empty tags until at least this many pills show |
+| `grouped` | 1 | 1 = one container pill with tags/layout as inset segments; 0 = separate pills |
+| `show-layout` | 1 | render the layout-symbol pill (click cycles the layout) |
 | `unfocused-saturation` | 0.4 | icon saturation on unfocused occupied tags (1.0 = full colour) |
 | `cursor-size` | *(unset)* | set to the **compositor's** cursor size so the pointer doesn't change size over the module (GTK otherwise uses its own size). Theme follows `XCURSOR_THEME`. |
+
+In `grouped` mode style `#asteroidz-ws.grouped` (the container) and the inset
+`.ws-pill.focused` (highlight); in separate mode style each `.ws-pill` directly.
 
 ## style.css
 
