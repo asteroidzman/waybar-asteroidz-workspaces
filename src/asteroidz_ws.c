@@ -29,9 +29,11 @@ typedef struct {
   int icon_size;                   // px
   int max_icons;                   // per tag
   int min_pills;                   // pad empties up to this many
+  int show_layout;                 // render the layout-symbol pill
   double unfocused_saturation;     // icon saturation on unfocused occupied tags
 
   char *active_monitor;            // name of active monitor
+  char layout_symbol[32];          // active monitor's layout symbol (S/T/M…)
   char tag_name[MAXTAGS + 1][128];
   int tag_clients[MAXTAGS + 1];
   int tag_active[MAXTAGS + 1];
@@ -118,6 +120,15 @@ static gboolean on_tag_pressed(GtkWidget *w, GdkEventButton *ev, gpointer data) 
   char arg[32];
   g_snprintf(arg, sizeof arg, "view,%d", tag);
   char *argv[] = {"amsg", "dispatch", arg, NULL};
+  g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
+  return TRUE;
+}
+
+// Layout pill click → cycle the layout.
+static gboolean on_layout_pressed(GtkWidget *w, GdkEventButton *ev, gpointer data) {
+  (void)w; (void)data;
+  if (ev->button != 1) return FALSE;
+  char *argv[] = {"amsg", "dispatch", "switch_layout", NULL};
   g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
   return TRUE;
 }
@@ -221,6 +232,29 @@ static void rebuild(Instance *self) {
     g_signal_connect(btn, "button-press-event", G_CALLBACK(on_tag_pressed), GINT_TO_POINTER(n));
     gtk_box_pack_start(GTK_BOX(self->box), btn, FALSE, FALSE, 0);
   }
+
+  // Layout-symbol pill (click to cycle layouts).
+  if (self->show_layout && self->layout_symbol[0]) {
+    GtkWidget *lb = gtk_event_box_new();
+    gtk_widget_add_events(lb, GDK_BUTTON_PRESS_MASK);
+    gtk_widget_set_margin_top(lb, 9);
+    gtk_widget_set_margin_bottom(lb, 9);
+    gtk_widget_set_margin_start(lb, 3);
+    gtk_widget_set_margin_end(lb, 3);
+    GtkStyleContext *lc = gtk_widget_get_style_context(lb);
+    gtk_style_context_add_class(lc, "ws-pill");
+    gtk_style_context_add_class(lc, "ws-layout");
+    GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+    gtk_widget_set_margin_start(lh, 12);
+    gtk_widget_set_margin_end(lh, 12);
+    char lt[48];
+    g_snprintf(lt, sizeof lt, "◫ %s", self->layout_symbol);
+    gtk_box_pack_start(GTK_BOX(lh), gtk_label_new(lt), FALSE, FALSE, 0);
+    gtk_container_add(GTK_CONTAINER(lb), lh);
+    g_signal_connect(lb, "button-press-event", G_CALLBACK(on_layout_pressed), NULL);
+    gtk_box_pack_start(GTK_BOX(self->box), lb, FALSE, FALSE, 0);
+  }
+
   gtk_widget_show_all(self->box);
 }
 
@@ -243,6 +277,12 @@ static void parse_monitors(Instance *self, const char *line) {
   g_free(self->active_monitor);
   self->active_monitor = g_strdup(json_object_has_member(active, "name")
                                       ? json_object_get_string_member(active, "name") : "");
+
+  self->layout_symbol[0] = '\0';
+  if (json_object_has_member(active, "layout_symbol")) {
+    const char *ls = json_object_get_string_member(active, "layout_symbol");
+    if (ls) g_strlcpy(self->layout_symbol, ls, sizeof self->layout_symbol);
+  }
 
   for (int n = 0; n <= MAXTAGS; n++) {
     self->tag_clients[n] = 0; self->tag_active[n] = 0; self->tag_urgent[n] = 0;
@@ -353,6 +393,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
   self->icon_size = 18;
   self->max_icons = 3;
   self->min_pills = 3;
+  self->show_layout = 1;
   self->unfocused_saturation = 0.4;
 
   int cursor_size = 0;  // 0 = leave GTK default alone
@@ -360,6 +401,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
     if (!strcmp(entries[i].key, "icon-size")) self->icon_size = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "max-icons")) self->max_icons = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "min-pills")) self->min_pills = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "show-layout")) self->show_layout = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
     else if (!strcmp(entries[i].key, "cursor-size")) cursor_size = atoi(entries[i].value);
   }
