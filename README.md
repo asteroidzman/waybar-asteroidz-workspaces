@@ -44,17 +44,19 @@ make install                 # → ~/.local/lib/waybar/libasteroidz_ws.so
 
 ## style.css
 
+Pills are `GtkButton`s carrying `.ws-pill` plus a state class. (The plugin pins
+GTK's cursor size to `XCURSOR_SIZE` so the pointer doesn't shrink on hover.)
+
 ```css
-#asteroidz-ws button { /* .ws-pill */
-    background-color: @surface_container_high;
+#asteroidz-ws .ws-pill {
     border-radius: 9px;
     padding: 0 10px;
     margin: 9px 3px;
 }
-#asteroidz-ws button.focused  { background-color: @primary; color: @on_primary; }
-#asteroidz-ws button.occupied { background-color: @surface_container_high; }
-#asteroidz-ws button.empty    { background-color: transparent; color: @outline; }
-#asteroidz-ws button.urgent   { background-color: @error; color: @on_error; }
+#asteroidz-ws .ws-pill.focused  { background-color: @primary; color: @on_primary; }
+#asteroidz-ws .ws-pill.occupied { background-color: @surface_container_high; }
+#asteroidz-ws .ws-pill.empty    { background-color: transparent; color: @outline; }
+#asteroidz-ws .ws-pill.urgent   { background-color: @error; color: @on_error; }
 ```
 
 ## License

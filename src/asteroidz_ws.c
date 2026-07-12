@@ -274,6 +274,12 @@ void *wbcffi_init(const wbcffi_init_info *info,
                   const wbcffi_config_entry *entries, size_t entries_len) {
   Instance *self = g_new0(Instance, 1);
   self->icon_theme = gtk_icon_theme_get_default();
+
+  // GtkButton hover otherwise renders the cursor at GTK's default size; pin it to
+  // the compositor's XCURSOR_SIZE so the cursor doesn't shrink over the pills.
+  const char *xcs = g_getenv("XCURSOR_SIZE");
+  int csize = (xcs && atoi(xcs) > 0) ? atoi(xcs) : 24;
+  g_object_set(gtk_settings_get_default(), "gtk-cursor-theme-size", csize, NULL);
   self->icon_size = 18;
   self->max_icons = 3;
   self->min_pills = 3;
