@@ -355,12 +355,23 @@ void *wbcffi_init(const wbcffi_init_info *info,
   self->min_pills = 3;
   self->unfocused_saturation = 0.4;
 
+  int cursor_size = 0;  // 0 = leave GTK default alone
   for (size_t i = 0; i < entries_len; i++) {
     if (!strcmp(entries[i].key, "icon-size")) self->icon_size = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "max-icons")) self->max_icons = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "min-pills")) self->min_pills = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
+    else if (!strcmp(entries[i].key, "cursor-size")) cursor_size = atoi(entries[i].value);
   }
+
+  // Match the compositor's cursor so the pointer size doesn't change over the
+  // module. GTK otherwise picks its own size (XCURSOR_SIZE / gsettings), which may
+  // differ from the compositor's. Set "cursor-size" in the module config to the
+  // compositor's cursor size; the theme name follows XCURSOR_THEME.
+  GtkSettings *settings = gtk_settings_get_default();
+  const char *ctheme = g_getenv("XCURSOR_THEME");
+  if (ctheme && *ctheme) g_object_set(settings, "gtk-cursor-theme-name", ctheme, NULL);
+  if (cursor_size > 0) g_object_set(settings, "gtk-cursor-theme-size", cursor_size, NULL);
 
   GtkContainer *root = info->get_root_widget(info->obj);
   self->box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
