@@ -30,6 +30,7 @@ typedef struct {
   int icon_size;                   // px
   int max_icons;                   // per tag
   int min_pills;                   // pad empties up to this many
+  int tag_padding;                 // horizontal inner padding per tag (0 = default)
   int show_layout;                 // render the layout-symbol pill
   int grouped;                     // one container pill with segments (vs separate pills)
   double unfocused_saturation;     // icon saturation on unfocused occupied tags
@@ -153,10 +154,11 @@ static void rebuild(Instance *self) {
   if (need < 0) need = 0;
 
   // In grouped mode segments are inset inside the container pill (smaller vertical
-  // margin, tighter padding); otherwise each is a full standalone pill.
-  int seg_mv = self->grouped ? 5 : 9;
-  int seg_mh = self->grouped ? 3 : 3;
-  int seg_hp = self->grouped ? 8 : 12;
+  // margin); otherwise each is a full standalone pill. Horizontal inner padding
+  // per tag is `tag-padding` (config), falling back to a comfortable default.
+  int seg_mv = self->grouped ? 6 : 9;
+  int seg_mh = self->grouped ? 4 : 3;
+  int seg_hp = self->tag_padding > 0 ? self->tag_padding : (self->grouped ? 16 : 14);
 
   for (int n = 1; n <= MAXTAGS; n++) {
     int relevant = (self->tag_clients[n] > 0 || self->tag_active[n]);
@@ -440,6 +442,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
     if (!strcmp(entries[i].key, "icon-size")) self->icon_size = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "max-icons")) self->max_icons = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "min-pills")) self->min_pills = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "tag-padding")) self->tag_padding = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "show-layout")) self->show_layout = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "grouped")) self->grouped = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
