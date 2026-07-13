@@ -25,6 +25,7 @@ const size_t wbcffi_version = 1;
 
 typedef struct {
   GtkWidget *box;                  // horizontal container of pills
+  GCancellable *cancel;            // cancels pending socket reads before teardown
   GtkIconTheme *icon_theme;
   int icon_size;                   // px
   int max_icons;                   // per tag
@@ -371,15 +372,27 @@ static void parse_clients(Instance *self, const char *line) {
 }
 
 // ─── async line readers ──────────────────────────────────────────────────────
-typedef struct { Instance *self; int kind; GDataInputStream *in; } ReadCtx;
+// Each reader holds its own ref to the instance's GCancellable so it survives
+// after `self` is freed on teardown. on_line checks cancellation BEFORE touching
+// `self` — fixes the use-after-free crash on waybar reload (matugen's SIGUSR2 on
+// wallpaper change tears every module down and back up while the socket streams).
+typedef struct { Instance *self; int kind; GDataInputStream *in; GCancellable *cancel; } ReadCtx;
 
 static void read_line(ReadCtx *rc);
+
+static void read_ctx_free(ReadCtx *rc) {
+  g_object_unref(rc->cancel);
+  g_object_unref(rc->in);
+  g_free(rc);
+}
 
 static void on_line(GObject *src, GAsyncResult *res, gpointer data) {
   ReadCtx *rc = data;
   gsize len = 0;
   char *line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(src), res, &len, NULL);
-  if (!line) { g_free(rc); return; }
+  // A watch frame may have arrived just before cancel, so check the cancellable
+  // explicitly rather than trusting a non-NULL line.
+  if (g_cancellable_is_cancelled(rc->cancel) || !line) { g_free(line); read_ctx_free(rc); return; }
   if (len > 0) {
     if (rc->kind == 0) parse_monitors(rc->self, line);
     else parse_clients(rc->self, line);
@@ -389,7 +402,7 @@ static void on_line(GObject *src, GAsyncResult *res, gpointer data) {
 }
 
 static void read_line(ReadCtx *rc) {
-  g_data_input_stream_read_line_async(rc->in, G_PRIORITY_DEFAULT, NULL, on_line, rc);
+  g_data_input_stream_read_line_async(rc->in, G_PRIORITY_DEFAULT, rc->cancel, on_line, rc);
 }
 
 static GDataInputStream *open_watch(const char *sockpath, const char *verb) {
@@ -462,19 +475,24 @@ void *wbcffi_init(const wbcffi_init_info *info,
   gtk_container_add(root, self->box);
   gtk_widget_show_all(GTK_WIDGET(root));
 
+  self->cancel = g_cancellable_new();
   const char *sig = g_getenv("ASTEROIDZ_INSTANCE_SIGNATURE");
   if (!sig || !*sig) sig = g_getenv("MANGO_INSTANCE_SIGNATURE");
   if (sig && *sig) {
     GDataInputStream *mon = open_watch(sig, "watch all-monitors\n");
-    if (mon) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 0; rc->in = mon; read_line(rc); }
+    if (mon) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 0; rc->in = mon; rc->cancel = g_object_ref(self->cancel); read_line(rc); }
     GDataInputStream *cli = open_watch(sig, "watch all-clients\n");
-    if (cli) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 1; rc->in = cli; read_line(rc); }
+    if (cli) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 1; rc->in = cli; rc->cancel = g_object_ref(self->cancel); read_line(rc); }
   }
   return self;
 }
 
 void wbcffi_deinit(void *instance) {
   Instance *self = instance;
+  if (self->cancel) {          // readers bail + self-free once cancelled
+    g_cancellable_cancel(self->cancel);
+    g_object_unref(self->cancel);
+  }
   for (int n = 0; n <= MAXTAGS; n++) {
     if (self->tag_appids[n]) g_ptr_array_free(self->tag_appids[n], TRUE);
     if (self->tag_titles[n]) g_ptr_array_free(self->tag_titles[n], TRUE);
