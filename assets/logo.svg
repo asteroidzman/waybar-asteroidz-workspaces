@@ -3,7 +3,7 @@
   <defs>
     <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#d7dcea"/>
+      <stop offset="1" stop-color="#cfd6e6"/>
     </linearGradient>
     <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffd27f"/>
@@ -12,14 +12,14 @@
     </linearGradient>
   </defs>
 
-  <!-- orange exhaust plume (behind the hull, emerging from the rear notch) -->
-  <path d="M40,64 L50,98 L60,64 Z" fill="url(#flame)"/>
-  <path d="M45,64 L50,88 L55,64 Z" fill="#fff2cf"/>
-
-  <!-- Atari-Asteroids triangle ship, pointing up with a rear notch -->
-  <path d="M50,6 L82,86 L50,66 L18,86 Z"
-        fill="url(#hull)" stroke="#0f1220" stroke-opacity="0.28"
-        stroke-width="2.5" stroke-linejoin="round"/>
-  <!-- subtle cockpit highlight -->
-  <path d="M50,22 L64,58 L50,50 L36,58 Z" fill="#ffffff" fill-opacity="0.35"/>
+  <!-- ship defined pointing up, whole craft rotated 45° to the right -->
+  <g transform="rotate(45 50 50)">
+    <!-- orange exhaust plume out of the rear notch -->
+    <path d="M42,64 L50,96 L58,64 Z" fill="url(#flame)"/>
+    <path d="M46,64 L50,86 L54,64 Z" fill="#fff2cf"/>
+    <!-- hollow (wireframe) Atari-Asteroids triangle ship -->
+    <path d="M50,8 L78,84 L50,64 L22,84 Z"
+          fill="none" stroke="url(#hull)" stroke-width="7"
+          stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
 </svg>

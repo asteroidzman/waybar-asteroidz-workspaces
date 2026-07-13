@@ -165,7 +165,7 @@ static void rebuild(Instance *self) {
   // Leading logo pill: the Atari-Asteroids triangle ship (with orange plume).
   if (self->show_logo && self->logo_icon) {
     GdkPixbuf *pb = gdk_pixbuf_new_from_file_at_size(self->logo_icon,
-                                                     self->icon_size + 6, self->icon_size + 6, NULL);
+                                                     self->icon_size, self->icon_size, NULL);
     if (pb) {
       GtkWidget *lp = gtk_event_box_new();       // decorative (no click handler)
       gtk_widget_set_margin_top(lp, seg_mv);
@@ -176,9 +176,11 @@ static void rebuild(Instance *self) {
       gtk_style_context_add_class(lc, "ws-pill");
       gtk_style_context_add_class(lc, "ws-logo");
       GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+      gtk_widget_set_valign(lh, GTK_ALIGN_CENTER);
       gtk_widget_set_margin_start(lh, seg_hp);
       gtk_widget_set_margin_end(lh, seg_hp);
       GtkWidget *img = gtk_image_new_from_pixbuf(pb);
+      gtk_widget_set_halign(img, GTK_ALIGN_CENTER);
       gtk_widget_set_valign(img, GTK_ALIGN_CENTER);
       g_object_unref(pb);
       gtk_box_pack_start(GTK_BOX(lh), img, FALSE, FALSE, 0);
@@ -207,6 +209,7 @@ static void rebuild(Instance *self) {
     else gtk_style_context_add_class(ctx, "empty");
 
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+    gtk_widget_set_valign(hbox, GTK_ALIGN_CENTER);
     gtk_widget_set_margin_start(hbox, seg_hp);   // horizontal padding inside the segment
     gtk_widget_set_margin_end(hbox, seg_hp);
 
@@ -218,6 +221,7 @@ static void rebuild(Instance *self) {
     else
       g_snprintf(label, sizeof label, "%d", n);
     GtkWidget *lbl = gtk_label_new(label);
+    gtk_widget_set_valign(lbl, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(hbox), lbl, FALSE, FALSE, 0);
 
     // Group by app (one icon per unique app-id), emphasise the focused app,
