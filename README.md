@@ -2,8 +2,8 @@
 
 A [waybar](https://github.com/Alexays/Waybar) **CFFI plugin** that renders
 [asteroidz](https://github.com/asteroidzman/asteroidz) workspace
-**tags as pills with real application icons** — the way DankMaterialShell shows
-them. Waybar's `custom` modules are text-only, so per-workspace app icons
+**tags as pills with real application icons**. Waybar's `custom` modules are
+text-only, so per-workspace app icons
 otherwise have to be Nerd-Font glyphs; this plugin uses actual `GtkImage` icons
 resolved from the desktop database / icon theme.
 

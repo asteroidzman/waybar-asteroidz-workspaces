@@ -2,7 +2,7 @@
 //
 // Custom (script) modules are text-only, so per-workspace app icons can only be
 // Nerd-Font glyphs. This plugin renders GtkImage app icons resolved from the
-// desktop database / icon theme, matching the DankMaterialShell look.
+// desktop database / icon theme.
 //
 // It connects to the asteroidz JSON-over-unix-socket IPC (ASTEROIDZ_INSTANCE_
 // SIGNATURE, MANGO_INSTANCE_SIGNATURE fallback), watches all-monitors + all-
