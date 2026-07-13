@@ -32,6 +32,8 @@ typedef struct {
   int min_pills;                   // pad empties up to this many
   int tag_padding;                 // horizontal inner padding per tag (0 = default)
   int show_layout;                 // render the layout-symbol pill
+  int show_logo;                   // render the leading logo pill (Asteroids ship)
+  char *logo_icon;                 // path to the logo SVG
   int grouped;                     // one container pill with segments (vs separate pills)
   double unfocused_saturation;     // icon saturation on unfocused occupied tags
 
@@ -159,6 +161,31 @@ static void rebuild(Instance *self) {
   int seg_mv = self->grouped ? 6 : 9;
   int seg_mh = self->grouped ? 4 : 3;
   int seg_hp = self->tag_padding > 0 ? self->tag_padding : (self->grouped ? 16 : 14);
+
+  // Leading logo pill: the Atari-Asteroids triangle ship (with orange plume).
+  if (self->show_logo && self->logo_icon) {
+    GdkPixbuf *pb = gdk_pixbuf_new_from_file_at_size(self->logo_icon,
+                                                     self->icon_size + 6, self->icon_size + 6, NULL);
+    if (pb) {
+      GtkWidget *lp = gtk_event_box_new();       // decorative (no click handler)
+      gtk_widget_set_margin_top(lp, seg_mv);
+      gtk_widget_set_margin_bottom(lp, seg_mv);
+      gtk_widget_set_margin_start(lp, seg_mh);
+      gtk_widget_set_margin_end(lp, seg_mh);
+      GtkStyleContext *lc = gtk_widget_get_style_context(lp);
+      gtk_style_context_add_class(lc, "ws-pill");
+      gtk_style_context_add_class(lc, "ws-logo");
+      GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+      gtk_widget_set_margin_start(lh, seg_hp);
+      gtk_widget_set_margin_end(lh, seg_hp);
+      GtkWidget *img = gtk_image_new_from_pixbuf(pb);
+      gtk_widget_set_valign(img, GTK_ALIGN_CENTER);
+      g_object_unref(pb);
+      gtk_box_pack_start(GTK_BOX(lh), img, FALSE, FALSE, 0);
+      gtk_container_add(GTK_CONTAINER(lp), lh);
+      gtk_box_pack_start(GTK_BOX(self->box), lp, FALSE, FALSE, 0);
+    }
+  }
 
   for (int n = 1; n <= MAXTAGS; n++) {
     int relevant = (self->tag_clients[n] > 0 || self->tag_active[n]);
@@ -434,6 +461,7 @@ void *wbcffi_init(const wbcffi_init_info *info,
   self->max_icons = 3;
   self->min_pills = 3;
   self->show_layout = 1;
+  self->show_logo = 1;
   self->grouped = 1;
   self->unfocused_saturation = 0.4;
 
@@ -444,6 +472,8 @@ void *wbcffi_init(const wbcffi_init_info *info,
     else if (!strcmp(entries[i].key, "min-pills")) self->min_pills = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "tag-padding")) self->tag_padding = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "show-layout")) self->show_layout = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "show-logo")) self->show_logo = atoi(entries[i].value);
+    else if (!strcmp(entries[i].key, "logo-icon")) { g_free(self->logo_icon); self->logo_icon = g_strdup(entries[i].value); }
     else if (!strcmp(entries[i].key, "grouped")) self->grouped = atoi(entries[i].value);
     else if (!strcmp(entries[i].key, "unfocused-saturation")) self->unfocused_saturation = atof(entries[i].value);
     else if (!strcmp(entries[i].key, "cursor-size")) cursor_size = atoi(entries[i].value);
@@ -453,6 +483,11 @@ void *wbcffi_init(const wbcffi_init_info *info,
     const char *dh = g_getenv("XDG_DATA_HOME");
     self->layout_dir = (dh && *dh) ? g_build_filename(dh, "asteroidz-ws", "layouts", NULL)
                                    : g_build_filename(g_get_home_dir(), ".local/share/asteroidz-ws/layouts", NULL);
+  }
+  if (!self->logo_icon) {
+    const char *dh = g_getenv("XDG_DATA_HOME");
+    self->logo_icon = (dh && *dh) ? g_build_filename(dh, "asteroidz-ws", "logo.svg", NULL)
+                                  : g_build_filename(g_get_home_dir(), ".local/share/asteroidz-ws/logo.svg", NULL);
   }
 
   // Match the compositor's cursor so the pointer size doesn't change over the
@@ -502,5 +537,6 @@ void wbcffi_deinit(void *instance) {
   }
   g_free(self->active_monitor);
   g_free(self->layout_dir);
+  g_free(self->logo_icon);
   g_free(self);
 }

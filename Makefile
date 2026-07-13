@@ -12,7 +12,8 @@ $(PLUGIN): src/asteroidz_ws.c
 install: $(PLUGIN)
 	install -Dm755 $(PLUGIN) $(PREFIX)/$(PLUGIN)
 	install -Dm644 -t $(DATADIR)/layouts assets/layouts/*.svg
-	@echo "installed to $(PREFIX)/$(PLUGIN) + layouts in $(DATADIR)/layouts"
+	install -Dm644 assets/logo.svg $(DATADIR)/logo.svg
+	@echo "installed to $(PREFIX)/$(PLUGIN) + layouts/logo in $(DATADIR)"
 
 clean:
 	rm -f $(PLUGIN)

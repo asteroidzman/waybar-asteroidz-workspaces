@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d7dcea"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27f"/>
+      <stop offset="0.5" stop-color="#ff9a3c"/>
+      <stop offset="1" stop-color="#f2603f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- orange exhaust plume (behind the hull, emerging from the rear notch) -->
+  <path d="M40,64 L50,98 L60,64 Z" fill="url(#flame)"/>
+  <path d="M45,64 L50,88 L55,64 Z" fill="#fff2cf"/>
+
+  <!-- Atari-Asteroids triangle ship, pointing up with a rear notch -->
+  <path d="M50,6 L82,86 L50,66 L18,86 Z"
+        fill="url(#hull)" stroke="#0f1220" stroke-opacity="0.28"
+        stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- subtle cockpit highlight -->
+  <path d="M50,22 L64,58 L50,50 L36,58 Z" fill="#ffffff" fill-opacity="0.35"/>
+</svg>
