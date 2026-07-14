@@ -46,6 +46,7 @@ typedef struct {
   int tag_urgent[MAXTAGS + 1];
   char tag_focus_appid[MAXTAGS + 1][128];  // app-id of the focused window on this tag
   char focused_title[256];                 // title of the focused window (active monitor)
+  char focused_appid[128];                 // app-id of the focused window (active monitor)
   int title_max;                           // max chars of the title before ellipsis (0 = hide)
   GPtrArray *tag_appids[MAXTAGS + 1];      // char* app-ids on this tag (active monitor)
   GPtrArray *tag_titles[MAXTAGS + 1];      // char* "app — title" for the tooltip
@@ -316,14 +317,21 @@ static void rebuild(Instance *self) {
     gtk_box_pack_start(GTK_BOX(self->box), lb, FALSE, FALSE, 0);
   }
 
-  // Focused-window title, ellipsized if too long, coloured by the theme (.ws-title).
+  // Focused-window app icon + title, ellipsized if too long, coloured by the theme (.ws-title).
   if (self->title_max > 0 && self->focused_title[0]) {
+    if (self->focused_appid[0]) {
+      GtkWidget *ic = image_for_appid(self, self->focused_appid, self->icon_size, 1.0);
+      gtk_widget_set_valign(ic, GTK_ALIGN_CENTER);
+      gtk_style_context_add_class(gtk_widget_get_style_context(ic), "ws-title-icon");
+      gtk_widget_set_margin_start(ic, seg_hp);
+      gtk_box_pack_start(GTK_BOX(self->box), ic, FALSE, FALSE, 0);
+    }
     GtkWidget *tl = gtk_label_new(self->focused_title);
     gtk_label_set_ellipsize(GTK_LABEL(tl), PANGO_ELLIPSIZE_END);
     gtk_label_set_max_width_chars(GTK_LABEL(tl), self->title_max);
     gtk_widget_set_valign(tl, GTK_ALIGN_CENTER);
     gtk_style_context_add_class(gtk_widget_get_style_context(tl), "ws-title");
-    gtk_widget_set_margin_start(tl, seg_hp);
+    gtk_widget_set_margin_start(tl, self->focused_appid[0] ? 4 : seg_hp);
     gtk_widget_set_margin_end(tl, seg_hp);
     gtk_box_pack_start(GTK_BOX(self->box), tl, FALSE, FALSE, 0);
   }
@@ -396,6 +404,7 @@ static void parse_clients(Instance *self, const char *line) {
     self->tag_focus_appid[n][0] = '\0';
   }
   self->focused_title[0] = '\0';
+  self->focused_appid[0] = '\0';
   for (guint i = 0; i < json_array_get_length(cl); i++) {
     JsonObject *c = json_array_get_object_element(cl, i);
     const char *mon = json_object_has_member(c, "monitor") ? json_object_get_string_member(c, "monitor") : NULL;
@@ -404,7 +413,10 @@ static void parse_clients(Instance *self, const char *line) {
     if (!appid) continue;
     const char *title = json_object_has_member(c, "title") ? json_object_get_string_member(c, "title") : "";
     gboolean focused = json_object_has_member(c, "is_focused") && json_object_get_boolean_member(c, "is_focused");
-    if (focused) g_strlcpy(self->focused_title, (title && *title) ? title : appid, sizeof self->focused_title);
+    if (focused) {
+      g_strlcpy(self->focused_title, (title && *title) ? title : appid, sizeof self->focused_title);
+      g_strlcpy(self->focused_appid, appid, sizeof self->focused_appid);
+    }
     if (!json_object_has_member(c, "tags")) continue;
     JsonArray *tg = json_object_get_array_member(c, "tags");
     for (guint j = 0; j < json_array_get_length(tg); j++) {
