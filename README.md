@@ -55,12 +55,16 @@ Options:
 | `show-layout` | 1 | render the layout pill (click cycles the layout); shows `layouts/{tile,scroller,monocle}.svg` if present, else the text symbol |
 | `layout-icon-dir` | `$XDG_DATA_HOME/asteroidz-ws/layouts` | dir holding the layout SVGs (installed by `make install`) |
 | `show-logo` | 1 | render the leading logo pill (the Atari-Asteroids triangle ship with an orange exhaust plume) |
+| `title-max-chars` | 40 | max chars of the focused-window title before it ellipsizes (`0` hides the title) |
 | `logo-icon` | `$XDG_DATA_HOME/asteroidz-ws/logo.svg` | path to the logo SVG (installed by `make install`) |
 | `unfocused-saturation` | 0.4 | icon saturation on unfocused occupied tags (1.0 = full colour) |
 | `cursor-size` | *(unset)* | set to the **compositor's** cursor size so the pointer doesn't change size over the module (GTK otherwise uses its own size). Theme follows `XCURSOR_THEME`. |
 
 In `grouped` mode style `#asteroidz-ws.grouped` (the container) and the inset
 `.ws-pill.focused` (highlight); in separate mode style each `.ws-pill` directly.
+
+The focused-window title trails the pills as `.ws-title` (ellipsized past
+`title-max-chars`) — style its `color` to follow your theme.
 
 ## style.css
 
