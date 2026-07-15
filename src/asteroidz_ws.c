@@ -13,6 +13,8 @@
 #include <gio/gunixsocketaddress.h>
 #include <gio/gdesktopappinfo.h>
 #include <json-glib/json-glib.h>
+#include <glib/gstdio.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -349,6 +351,7 @@ static void rebuild(Instance *self) {
     if (!strcmp(self->layout_symbol, "T")) lname = "tile";
     else if (!strcmp(self->layout_symbol, "S")) lname = "scroller";
     else if (!strcmp(self->layout_symbol, "M")) lname = "monocle";
+    else if (!strcmp(self->layout_symbol, "F")) lname = "float";
     GtkWidget *licon = NULL;
     if (lname && self->layout_dir) {
       char *path = g_strdup_printf("%s/%s.svg", self->layout_dir, lname);
@@ -517,6 +520,43 @@ static void read_line(ReadCtx *rc) {
   g_data_input_stream_read_line_async(rc->in, G_PRIORITY_DEFAULT, rc->cancel, on_line, rc);
 }
 
+// Resolve the compositor IPC socket. The env signature (set at compositor
+// launch) goes stale on every compositor restart -- its number is not the
+// running pid, so a client started against the old value silently connects to
+// nothing (blank panel). Prefer the env path only if it still exists; else
+// pick the newest asteroidz-*.sock (mango-*.sock) actually present in the
+// runtime dir, so a compositor restart never blanks the panel. Caller frees.
+static char *resolve_socket(void) {
+  const char *sig = g_getenv("ASTEROIDZ_INSTANCE_SIGNATURE");
+  if (!sig || !*sig) sig = g_getenv("MANGO_INSTANCE_SIGNATURE");
+  if (sig && *sig && g_file_test(sig, G_FILE_TEST_EXISTS))
+    return g_strdup(sig);
+
+  const char *rt = g_getenv("XDG_RUNTIME_DIR");
+  if (!rt || !*rt) return sig && *sig ? g_strdup(sig) : NULL;   // last resort
+  GDir *d = g_dir_open(rt, 0, NULL);
+  if (!d) return sig && *sig ? g_strdup(sig) : NULL;
+  char *best = NULL;
+  gint64 best_mtime = -1;
+  const char *name;
+  while ((name = g_dir_read_name(d))) {
+    if ((!g_str_has_prefix(name, "asteroidz-") && !g_str_has_prefix(name, "mango-")) ||
+        !g_str_has_suffix(name, ".sock"))
+      continue;
+    char *path = g_build_filename(rt, name, NULL);
+    GStatBuf st;
+    if (g_stat(path, &st) == 0 && S_ISSOCK(st.st_mode) && st.st_mtime > best_mtime) {
+      best_mtime = st.st_mtime;
+      g_free(best); best = path;
+    } else {
+      g_free(path);
+    }
+  }
+  g_dir_close(d);
+  if (best) return best;
+  return sig && *sig ? g_strdup(sig) : NULL;
+}
+
 static GDataInputStream *open_watch(const char *sockpath, const char *verb) {
   GError *err = NULL;
   GSocket *sock = g_socket_new(G_SOCKET_FAMILY_UNIX, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, &err);
@@ -599,14 +639,14 @@ void *wbcffi_init(const wbcffi_init_info *info,
   gtk_widget_show_all(GTK_WIDGET(root));
 
   self->cancel = g_cancellable_new();
-  const char *sig = g_getenv("ASTEROIDZ_INSTANCE_SIGNATURE");
-  if (!sig || !*sig) sig = g_getenv("MANGO_INSTANCE_SIGNATURE");
+  char *sig = resolve_socket();
   if (sig && *sig) {
     GDataInputStream *mon = open_watch(sig, "watch all-monitors\n");
     if (mon) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 0; rc->in = mon; rc->cancel = g_object_ref(self->cancel); read_line(rc); }
     GDataInputStream *cli = open_watch(sig, "watch all-clients\n");
     if (cli) { ReadCtx *rc = g_new0(ReadCtx, 1); rc->self = self; rc->kind = 1; rc->in = cli; rc->cancel = g_object_ref(self->cancel); read_line(rc); }
   }
+  g_free(sig);
   return self;
 }
 
