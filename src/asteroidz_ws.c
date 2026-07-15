@@ -117,6 +117,56 @@ static GtkWidget *image_for_appid(Instance *self, const char *appid, int size, d
   return img;
 }
 
+// ─── logo: rasterise the ship SVG with the plume recoloured to the accent ───
+static void logo_hex(GdkRGBA c, double to_white, double mul, char out[8]) {
+  double r = (c.red * mul) + (1.0 - c.red * mul) * to_white;
+  double g = (c.green * mul) + (1.0 - c.green * mul) * to_white;
+  double b = (c.blue * mul) + (1.0 - c.blue * mul) * to_white;
+  g_snprintf(out, 8, "#%02x%02x%02x",
+             (int)(CLAMP(r, 0, 1) * 255), (int)(CLAMP(g, 0, 1) * 255),
+             (int)(CLAMP(b, 0, 1) * 255));
+}
+// `ctxw` supplies the accent: CSS colours .ws-logo with @primary. The flame
+// hexes in assets/logo.svg are substituted with accent shades, then the SVG is
+// rasterised at icon size. Falls back to the file as-is if anything fails.
+static GdkPixbuf *logo_pixbuf(Instance *self, GtkWidget *ctxw) {
+  char *svg = NULL;
+  gsize len = 0;
+  GdkPixbuf *pb = NULL;
+  if (g_file_get_contents(self->logo_icon, &svg, &len, NULL)) {
+    GdkRGBA a;
+    GtkStyleContext *sc = gtk_widget_get_style_context(ctxw);
+    gtk_style_context_get_color(sc, gtk_style_context_get_state(sc), &a);
+    char light[8], base[8], dark[8], core[8];
+    // Plume matches the asteroidz ACTIVE TITLEBAR fill exactly: flat @primary
+    // (theme focus-bg-color), no shading — only the inner core lifts slightly.
+    logo_hex(a, 0.0, 1.0, light);
+    logo_hex(a, 0.0, 1.0, base);
+    logo_hex(a, 0.0, 1.0, dark);
+    logo_hex(a, 0.25, 1.0, core);
+    GString *s = g_string_new_len(svg, len);
+    g_string_replace(s, "#ffd27f", light, 0);
+    g_string_replace(s, "#ff9a3c", base, 0);
+    g_string_replace(s, "#f2603f", dark, 0);
+    g_string_replace(s, "#fff2cf", core, 0);
+    GdkPixbufLoader *ld = gdk_pixbuf_loader_new();
+    gdk_pixbuf_loader_set_size(ld, self->icon_size, self->icon_size);
+    if (gdk_pixbuf_loader_write(ld, (const guchar *)s->str, s->len, NULL) &&
+        gdk_pixbuf_loader_close(ld, NULL)) {
+      pb = gdk_pixbuf_loader_get_pixbuf(ld);
+      if (pb) g_object_ref(pb);
+    } else {
+      gdk_pixbuf_loader_close(ld, NULL);
+    }
+    g_object_unref(ld);
+    g_string_free(s, TRUE);
+    g_free(svg);
+  }
+  if (!pb) pb = gdk_pixbuf_new_from_file_at_size(self->logo_icon,
+                                                 self->icon_size, self->icon_size, NULL);
+  return pb;
+}
+
 // ─── click handler: view a tag ───────────────────────────────────────────────
 // EventBox (not GtkButton): buttons own an input window that makes GTK render the
 // cursor at its own size, so it doesn't match the compositor cursor. EventBoxes
@@ -165,31 +215,32 @@ static void rebuild(Instance *self) {
   int seg_mh = self->grouped ? 4 : 3;
   int seg_hp = self->tag_padding > 0 ? self->tag_padding : (self->grouped ? 16 : 14);
 
-  // Leading logo pill: the Atari-Asteroids triangle ship (with orange plume).
+  // Leading logo pill: the Atari-Asteroids triangle ship. The exhaust plume is
+  // recoloured to the theme accent (CSS colours .ws-logo with @primary) by
+  // substituting the flame gradient hexes in the SVG before rasterising, so it
+  // follows the matugen palette like the rest of the bar.
   if (self->show_logo && self->logo_icon) {
-    GdkPixbuf *pb = gdk_pixbuf_new_from_file_at_size(self->logo_icon,
-                                                     self->icon_size, self->icon_size, NULL);
-    if (pb) {
-      GtkWidget *lp = gtk_event_box_new();       // decorative (no click handler)
-      gtk_widget_set_margin_top(lp, seg_mv);
-      gtk_widget_set_margin_bottom(lp, seg_mv);
-      gtk_widget_set_margin_start(lp, seg_mh);
-      gtk_widget_set_margin_end(lp, seg_mh);
-      GtkStyleContext *lc = gtk_widget_get_style_context(lp);
-      gtk_style_context_add_class(lc, "ws-pill");
-      gtk_style_context_add_class(lc, "ws-logo");
-      GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-      gtk_widget_set_valign(lh, GTK_ALIGN_CENTER);
-      gtk_widget_set_margin_start(lh, seg_hp);
-      gtk_widget_set_margin_end(lh, seg_hp);
-      GtkWidget *img = gtk_image_new_from_pixbuf(pb);
-      gtk_widget_set_halign(img, GTK_ALIGN_CENTER);
-      gtk_widget_set_valign(img, GTK_ALIGN_CENTER);
-      g_object_unref(pb);
-      gtk_box_pack_start(GTK_BOX(lh), img, FALSE, FALSE, 0);
-      gtk_container_add(GTK_CONTAINER(lp), lh);
-      gtk_box_pack_start(GTK_BOX(self->box), lp, FALSE, FALSE, 0);
-    }
+    GtkWidget *lp = gtk_event_box_new();       // decorative (no click handler)
+    gtk_widget_set_margin_top(lp, seg_mv);
+    gtk_widget_set_margin_bottom(lp, seg_mv);
+    gtk_widget_set_margin_start(lp, seg_mh);
+    gtk_widget_set_margin_end(lp, seg_mh);
+    GtkStyleContext *lc = gtk_widget_get_style_context(lp);
+    gtk_style_context_add_class(lc, "ws-pill");
+    gtk_style_context_add_class(lc, "ws-logo");
+    GtkWidget *lh = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_valign(lh, GTK_ALIGN_CENTER);
+    gtk_widget_set_margin_start(lh, seg_hp);
+    gtk_widget_set_margin_end(lh, seg_hp);
+    GtkWidget *img = gtk_image_new();
+    gtk_widget_set_halign(img, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(img, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(lh), img, FALSE, FALSE, 0);
+    gtk_container_add(GTK_CONTAINER(lp), lh);
+    gtk_box_pack_start(GTK_BOX(self->box), lp, FALSE, FALSE, 0);   // attach first: CSS colour needs ancestry
+    GdkPixbuf *pb = logo_pixbuf(self, lp);
+    if (pb) { gtk_image_set_from_pixbuf(GTK_IMAGE(img), pb); g_object_unref(pb); }
+    else gtk_widget_destroy(lp);
   }
 
   for (int n = 1; n <= MAXTAGS; n++) {

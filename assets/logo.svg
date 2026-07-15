@@ -14,9 +14,12 @@
 
   <!-- ship defined pointing up, whole craft rotated 45° to the right -->
   <g transform="rotate(45 50 50)">
-    <!-- orange exhaust plume out of the rear notch -->
-    <path d="M42,64 L50,96 L58,64 Z" fill="url(#flame)"/>
-    <path d="M46,64 L50,86 L54,64 Z" fill="#fff2cf"/>
+    <!-- exhaust plume out of the rear notch — big flare; the tip rides the
+         rotated diagonal (rotate(45) leaves ~70 units from centre). The flame
+         hexes below are recoloured to the theme accent by the plugin at load
+         time (asteroidz_ws.c logo_pixbuf) — keep them verbatim. -->
+    <path d="M32,63 L50,119 L68,63 Z" fill="url(#flame)"/>
+    <path d="M41,63 L50,104 L59,63 Z" fill="#fff2cf"/>
     <!-- hollow (wireframe) Atari-Asteroids triangle ship -->
     <path d="M50,8 L78,84 L50,64 L22,84 Z"
           fill="none" stroke="url(#hull)" stroke-width="7"
