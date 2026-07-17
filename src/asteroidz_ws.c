@@ -174,21 +174,40 @@ static GdkPixbuf *logo_pixbuf(Instance *self, GtkWidget *ctxw) {
 // cursor at its own size, so it doesn't match the compositor cursor. EventBoxes
 // leave the cursor alone (like waybar's other modules). Spacing is applied with
 // widget margins because GtkEventBox doesn't honour CSS padding/margin.
+//
+// Always dispatched cross-monitor (view_cross_monitor, not plain view): each
+// bar renders ITS OWN monitor's tags now (see bar_output_geometry), which may
+// not be the currently-focused monitor, so the click must name it explicitly.
+// view_cross_monitor focuses that monitor then switches its view — a no-op
+// extra focus when it's already the focused one.
 static gboolean on_tag_pressed(GtkWidget *w, GdkEventButton *ev, gpointer data) {
-  (void)w;
   if (ev->button != 1) return FALSE;
   int tag = GPOINTER_TO_INT(data);
-  char arg[32];
-  g_snprintf(arg, sizeof arg, "view,%d", tag);
+  Instance *self = g_object_get_data(G_OBJECT(w), "asteroidz-ws-self");
+  const char *mon = (self && self->active_monitor) ? self->active_monitor : "";
+  // amsg dispatch takes ONE comma-joined "func,arg1,arg2" argv element, not
+  // separate argv items (see `amsg dispatch move_window,10,100` convention).
+  char arg[160];
+  g_snprintf(arg, sizeof arg, "view_cross_monitor,%d,%s", tag, mon);
   char *argv[] = {"amsg", "dispatch", arg, NULL};
   g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
   return TRUE;
 }
 
-// Layout pill click → cycle the layout.
+// Layout pill click → cycle the layout of THIS bar's own monitor: switch_layout
+// always acts on the compositor's currently-focused monitor, with no cross-
+// monitor variant, so focus that monitor first (a no-op if already focused).
 static gboolean on_layout_pressed(GtkWidget *w, GdkEventButton *ev, gpointer data) {
-  (void)w; (void)data;
+  (void)data;
   if (ev->button != 1) return FALSE;
+  Instance *self = g_object_get_data(G_OBJECT(w), "asteroidz-ws-self");
+  const char *mon = (self && self->active_monitor) ? self->active_monitor : "";
+  if (mon && *mon) {
+    char focus_arg[160];
+    g_snprintf(focus_arg, sizeof focus_arg, "focus_monitor,%s", mon);
+    char *focus_argv[] = {"amsg", "dispatch", focus_arg, NULL};
+    g_spawn_sync(NULL, focus_argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, NULL, NULL);
+  }
   char *argv[] = {"amsg", "dispatch", "switch_layout", NULL};
   g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
   return TRUE;
@@ -327,6 +346,7 @@ static void rebuild(Instance *self) {
     }
 
     gtk_container_add(GTK_CONTAINER(btn), hbox);
+    g_object_set_data(G_OBJECT(btn), "asteroidz-ws-self", self);
     g_signal_connect(btn, "button-press-event", G_CALLBACK(on_tag_pressed), GINT_TO_POINTER(n));
     gtk_box_pack_start(GTK_BOX(self->box), btn, FALSE, FALSE, 0);
   }
@@ -367,6 +387,7 @@ static void rebuild(Instance *self) {
       gtk_box_pack_start(GTK_BOX(lh), gtk_label_new(lt), FALSE, FALSE, 0);
     }
     gtk_container_add(GTK_CONTAINER(lb), lh);
+    g_object_set_data(G_OBJECT(lb), "asteroidz-ws-self", self);
     g_signal_connect(lb, "button-press-event", G_CALLBACK(on_layout_pressed), NULL);
     gtk_box_pack_start(GTK_BOX(self->box), lb, FALSE, FALSE, 0);
   }
@@ -393,6 +414,25 @@ static void rebuild(Instance *self) {
   gtk_widget_show_all(self->box);
 }
 
+// Resolve this bar's own physical output via GDK. Waybar's CFFI ABI has no
+// "which output is this bar on" field, but each bar is a real layer-shell
+// window mapped to one wl_output — so the toplevel's GdkMonitor geometry
+// (logical x/y, matching the compositor's own monitor x/y in the IPC JSON)
+// identifies it with zero config plumbing per output. Same technique wbcommon.h
+// uses for popup on-screen clamping.
+static gboolean bar_output_geometry(Instance *self, int *x, int *y) {
+  GtkWidget *top = gtk_widget_get_toplevel(self->box);
+  if (!gtk_widget_is_toplevel(top)) return FALSE;
+  GdkWindow *gw = gtk_widget_get_window(top);
+  if (!gw) return FALSE;
+  GdkMonitor *m = gdk_display_get_monitor_at_window(gtk_widget_get_display(top), gw);
+  if (!m) return FALSE;
+  GdkRectangle geo;
+  gdk_monitor_get_geometry(m, &geo);
+  *x = geo.x; *y = geo.y;
+  return TRUE;
+}
+
 // ─── parse all-monitors snapshot ─────────────────────────────────────────────
 static void parse_monitors(Instance *self, const char *line) {
   JsonParser *p = json_parser_new();
@@ -401,10 +441,25 @@ static void parse_monitors(Instance *self, const char *line) {
   if (!root || !json_object_has_member(root, "monitors")) { g_object_unref(p); return; }
   JsonArray *mons = json_object_get_array_member(root, "monitors");
 
+  // Prefer the monitor THIS bar is actually displayed on (by geometry) so each
+  // per-output bar shows its own tags. Fall back to the old global-active/first
+  // picker if the window isn't realized yet or geometry doesn't match anything
+  // (e.g. transient monitor-topology change, or a single-monitor setup).
   JsonObject *active = NULL;
-  for (guint i = 0; i < json_array_get_length(mons); i++) {
-    JsonObject *m = json_array_get_object_element(mons, i);
-    if (json_object_has_member(m, "active") && json_object_get_boolean_member(m, "active")) { active = m; break; }
+  int bx, by;
+  if (bar_output_geometry(self, &bx, &by)) {
+    for (guint i = 0; i < json_array_get_length(mons); i++) {
+      JsonObject *m = json_array_get_object_element(mons, i);
+      int mx = json_object_has_member(m, "x") ? (int)json_object_get_int_member(m, "x") : 0;
+      int my = json_object_has_member(m, "y") ? (int)json_object_get_int_member(m, "y") : 0;
+      if (mx == bx && my == by) { active = m; break; }
+    }
+  }
+  if (!active) {
+    for (guint i = 0; i < json_array_get_length(mons); i++) {
+      JsonObject *m = json_array_get_object_element(mons, i);
+      if (json_object_has_member(m, "active") && json_object_get_boolean_member(m, "active")) { active = m; break; }
+    }
   }
   if (!active && json_array_get_length(mons) > 0) active = json_array_get_object_element(mons, 0);
   if (!active) { g_object_unref(p); return; }
