@@ -15,7 +15,13 @@ install: $(PLUGIN)
 	install -Dm644 assets/logo.svg $(DATADIR)/logo.svg
 	@echo "installed to $(PREFIX)/$(PLUGIN) + layouts/logo in $(DATADIR)"
 
-clean:
-	rm -f $(PLUGIN)
+test_asteroidz_ws: tests/test_asteroidz_ws.c src/asteroidz_ws.c
+	$(CC) $(CFLAGS) -o $@ tests/test_asteroidz_ws.c $(LDLIBS)
 
-.PHONY: install clean
+test: test_asteroidz_ws
+	./test_asteroidz_ws
+
+clean:
+	rm -f $(PLUGIN) test_asteroidz_ws
+
+.PHONY: install clean test
