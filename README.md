@@ -23,7 +23,8 @@ resolved from the desktop database / icon theme.
 
 Arch Linux: `yay -S waybar-asteroidz-workspaces` (AUR).
 
-Requires `gtk3`, `glib2`, `json-glib` (and their dev headers) and a C compiler.
+Requires `gtk3`, `glib2`, `json-glib` (and their dev headers), `asteroidz`
+(the pills are driven by its IPC `amsg`) and a C compiler.
 
 ```sh
 make
