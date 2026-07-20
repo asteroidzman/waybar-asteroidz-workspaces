@@ -21,6 +21,8 @@ resolved from the desktop database / icon theme.
 
 ## Build & install
 
+Arch Linux: `yay -S waybar-asteroidz-workspaces` (AUR).
+
 Requires `gtk3`, `glib2`, `json-glib` (and their dev headers) and a C compiler.
 
 ```sh
