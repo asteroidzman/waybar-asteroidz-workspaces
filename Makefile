@@ -5,15 +5,16 @@ CFLAGS  += -fPIC $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS))
 PREFIX  ?= $(HOME)/.local/lib/waybar
 DATADIR ?= $(HOME)/.local/share/asteroidz-ws
+DESTDIR ?=
 
 $(PLUGIN): src/asteroidz_ws.c
 	$(CC) $(CFLAGS) -shared -o $@ $< $(LDLIBS)
 
 install: $(PLUGIN)
-	install -Dm755 $(PLUGIN) $(PREFIX)/$(PLUGIN)
-	install -Dm644 -t $(DATADIR)/layouts assets/layouts/*.svg
-	install -Dm644 assets/logo.svg $(DATADIR)/logo.svg
-	@echo "installed to $(PREFIX)/$(PLUGIN) + layouts/logo in $(DATADIR)"
+	install -Dm755 $(PLUGIN) $(DESTDIR)$(PREFIX)/$(PLUGIN)
+	install -Dm644 -t $(DESTDIR)$(DATADIR)/layouts assets/layouts/*.svg
+	install -Dm644 assets/logo.svg $(DESTDIR)$(DATADIR)/logo.svg
+	@echo "installed to $(DESTDIR)$(PREFIX)/$(PLUGIN) + layouts/logo in $(DESTDIR)$(DATADIR)"
 
 test_asteroidz_ws: tests/test_asteroidz_ws.c src/asteroidz_ws.c
 	$(CC) $(CFLAGS) -o $@ tests/test_asteroidz_ws.c $(LDLIBS)
